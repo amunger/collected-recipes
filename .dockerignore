@@ -1,0 +1,15 @@
+.copilot/
+.env*
+!.env.example
+.git/
+.github/
+.next/
+coverage/
+data/
+deploy/.env.azure
+docs/
+node_modules/
+npm-debug.log*
+*.db
+*.db-shm
+*.db-wal

@@ -1,36 +1,141 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Collected Recipes
 
-## Getting Started
+A mobile-first site that uses
+[GitHub Copilot SDK](https://github.com/github/copilot-sdk) and GPT-5.6 Luna to
+turn a recipe page into a clean, copyable ingredient list and instructions.
 
-First, run the development server:
+## Setup
 
-```bash
+Requirements:
+
+- Node.js 20.19+ or 22.12+
+- GitHub Copilot access
+
+```powershell
+npm install
+Copy-Item .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. When no token is configured, the SDK uses the
+locally signed-in Copilot user. For a hosted environment, set
+`COPILOT_GITHUB_TOKEN`. A FoodData Central key is recommended for nutrition;
+local development falls back to USDA's heavily rate-limited `DEMO_KEY`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. The browser posts either a recipe URL to `POST /api/recipes/extract` or one
+   or two recipe images to `POST /api/recipes/extract-images`, with optional
+   special instructions.
+2. The server rejects local/private addresses, follows up to three validated
+   redirects, and reads at most 2 MB of HTML.
+3. For URLs, the server prefers authoritative JSON-LD or recipe-card
+   ingredients and instruction steps, then adds bounded structured data and
+   visible text as context. Image uploads are validated as JPEG, PNG, GIF, or
+   WebP, limited to 8 MB each, and attached directly to the model request.
+4. A tool-free Copilot session pinned to `gpt-5.6-luna` translates that content
+   into a strict ingredient contract.
+5. Runtime validation rejects malformed JSON, missing ingredients or
+   instructions, unexpected fields, and invalid field types.
+6. The browser renders ingredient groups as they appear in the source recipe,
+   followed by numbered directions. Copy and Download preserve those groups in
+   clean Markdown.
+7. The server estimates ingredient weights, retrieves macro values from USDA
+   FoodData Central, and calculates per-ingredient and total macros.
+8. Named recipe snapshots, nutrition, and custom notes are stored in SQLite.
+   Transformations and notes remain local until the user chooses Save or
+   Save as.
+9. Up to three recently viewed unsaved recipes remain available in local
+   browser history.
 
-## Learn More
+The extraction API returns a request ID, recipe, and nutrition result. Saved
+recipe endpoints are available at `GET|POST /api/recipes`,
+`GET|PUT /api/recipes/:id`, and `POST /api/recipes/:id/transform`.
 
-To learn more about Next.js, take a look at the following resources:
+```json
+{
+  "ingredients": [
+    {
+      "amount": "1",
+      "estimatedGrams": 106,
+      "group": null,
+      "unit": "cup",
+      "ingredient": "Kodiak Cakes buttermilk waffle mix",
+      "notes": "*"
+    }
+  ],
+  "instructions": [
+    "Add all ingredients to a high speed blender and blend until smooth, scraping down the sides as necessary."
+  ],
+  "requestId": "f62088aa-e71b-48dc-b7e5-800888765a6f"
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`amount`, `group`, `unit`, and `notes` may be `null`. `ingredient` and every
+instruction are non-empty strings.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Before a public deployment, add authentication, rate limiting, and persistent
+storage.
 
-## Deploy on Vercel
+## Commands
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```powershell
+npm run dev
+npm test
+npm run lint
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Live integration test
+
+The normal suite is deterministic and does not call third-party services. To
+verify the entire real flow against
+[Kennabang's Favorite Protein Waffles Recipe](https://www.thewellnourishedmama.com/blog/kennabangs-favorite-protein-waffles-recipe),
+including a real GPT-5.6 Luna request:
+
+```powershell
+$env:RUN_LIVE_RECIPE_TESTS = "1"
+npm run test:live
+```
+
+This requires internet access and either a locally signed-in Copilot user or
+`COPILOT_GITHUB_TOKEN`. It verifies these seven normalized ingredients:
+
+1. 1 cup Kodiak Cakes buttermilk waffle mix (`*`)
+2. 1 cup low fat cottage cheese (`2% milkfat`)
+3. 2 large eggs
+4. 1/3 cup liquid egg whites (`**`)
+5. 1/4 cup unsweetened almond milk
+6. 1 teaspoon vanilla
+7. Cinnamon (`to taste`)
+
+It also verifies the recipe card's three instruction steps verbatim and in
+order.
+
+The test fails rather than silently falling back if `gpt-5.6-luna` is
+unavailable.
+
+## Logging
+
+Each API request receives a correlation ID. The server emits one-line JSON logs
+for URL and DNS validation, fetch status/redirects/timing, byte counts, parsing
+strategy, source ingredient and instruction counts, Copilot
+lifecycle/timing/model, contract validation, cleanup, and final status.
+
+Logs deliberately exclude tokens, authorization values, full fetched pages,
+full prompts, and full model responses.
+
+## Useful next additions
+
+- SQLite plus Drizzle ORM for a searchable recipe collection
+- Playwright for mobile browser coverage
+- A background job queue for slow recipe sites
+- OpenTelemetry for SDK and request diagnostics
+
+See [the product requirements](docs/product-requirements.md) for the
+special-instructions, saved-recipe, nutrition, and deployment increment.
+See [nutrition data](docs/nutrition-data.md) for calculation provenance and
+[deployment options](docs/deployment-options.md) for the pending hosting
+decision.
+The selected single-VM Azure procedure is in
+[Azure VM deployment](docs/azure-vm-deployment.md).
