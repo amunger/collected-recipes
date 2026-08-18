@@ -5,6 +5,10 @@ import {
   RecipePageFetchError,
 } from "@/lib/extract-recipe";
 import { enrichRecipe } from "@/lib/enrich-recipe";
+import {
+  createCopilotBusyResponse,
+  tryAcquireCopilotOperation,
+} from "@/lib/copilot-operation-gate";
 import { createRecipeLogger } from "@/lib/recipe-logger";
 
 export const runtime = "nodejs";
@@ -30,6 +34,19 @@ function isExtractRecipeRequest(value: unknown): value is ExtractRecipeRequest {
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
+  const lease = tryAcquireCopilotOperation();
+  if (!lease) {
+    return createCopilotBusyResponse(requestId);
+  }
+
+  try {
+    return await handlePost(request, requestId);
+  } finally {
+    lease.release();
+  }
+}
+
+async function handlePost(request: Request, requestId: string) {
   const logger = createRecipeLogger(requestId);
   let body: unknown;
 

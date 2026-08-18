@@ -1,5 +1,14 @@
 # Azure single-VM deployment
 
+> **Legacy standalone deployment:** this procedure and
+> `deploy/compose.azure.yml` use a public `80:3000` host-port mapping. They must
+> never be used on the shared Agent Outpost VM. Current production builds also
+> require a private HTTPS Tailscale Serve identity path; this script does not
+> configure one. Use
+> [Private Agent Outpost deployment](agent-outpost-deployment.md) for the shared
+> VM, or add an equivalent private Serve front end before using this standalone
+> design.
+
 This deployment runs one Linux container on a low-cost Azure VM and stores
 SQLite on a separate managed data disk.
 
@@ -64,6 +73,8 @@ Fill in:
 ```text
 COPILOT_GITHUB_TOKEN=<fine-grained token>
 FDC_API_KEY=<data.gov FoodData Central key>
+RECIPE_PUBLIC_BASE_URL=https://<private-tailnet-origin>
+RECIPE_REQUIRE_TAILSCALE_IDENTITY=true
 ```
 
 Never commit `deploy/.env.azure`. The deployment script refuses to proceed
@@ -110,7 +121,9 @@ GET /api/health -> 200 {"status":"ok"}
 ```
 
 The deployment script then verifies the same endpoint through the public IP.
-After deployment, manually:
+That health result does not prove the protected recipe API is reachable.
+Configure private Tailscale Serve HTTPS and remove direct network access before
+manually testing:
 
 1. open the printed URL from the allowed network
 2. extract a real recipe

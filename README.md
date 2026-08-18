@@ -22,6 +22,13 @@ locally signed-in Copilot user. For a hosted environment, set
 `COPILOT_GITHUB_TOKEN`. A FoodData Central key is recommended for nutrition;
 local development falls back to USDA's heavily rate-limited `DEMO_KEY`.
 
+Production is private-only. Set `RECIPE_PUBLIC_BASE_URL` to the exact HTTPS
+origin and `RECIPE_REQUIRE_TAILSCALE_IDENTITY=true`, then expose the process
+only through Tailscale Serve. Production recipe requests fail closed when
+either setting is missing or unsafe. Tailscale identity is required for every
+`/api/recipes` request, and mutations also require an exact browser `Origin`.
+`GET /api/health` remains available to loopback health checks.
+
 ## How it works
 
 1. The browser posts either a recipe URL to `POST /api/recipes/extract` or one
@@ -74,8 +81,8 @@ recipe endpoints are available at `GET|POST /api/recipes`,
 `amount`, `group`, `unit`, and `notes` may be `null`. `ingredient` and every
 instruction are non-empty strings.
 
-Before a public deployment, add authentication, rate limiting, and persistent
-storage.
+Do not expose this application directly to the public internet. The trusted
+identity header is safe only when direct access to the app port is blocked.
 
 ## Commands
 
@@ -137,5 +144,8 @@ special-instructions, saved-recipe, nutrition, and deployment increment.
 See [nutrition data](docs/nutrition-data.md) for calculation provenance and
 [deployment options](docs/deployment-options.md) for the pending hosting
 decision.
+The supported shared-VM shape is documented in
+[Private Agent Outpost deployment](docs/agent-outpost-deployment.md).
 The selected single-VM Azure procedure is in
-[Azure VM deployment](docs/azure-vm-deployment.md).
+[Azure VM deployment](docs/azure-vm-deployment.md); that legacy standalone
+procedure is not for the shared Agent Outpost VM.

@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  createCopilotBusyResponse,
+  tryAcquireCopilotOperation,
+} from "@/lib/copilot-operation-gate";
 import { enrichRecipe } from "@/lib/enrich-recipe";
 import { transformRecipe } from "@/lib/extract-recipe";
 import { createRecipeLogger } from "@/lib/recipe-logger";
@@ -16,6 +20,23 @@ export async function POST(
   context: RecipeRouteContext,
 ) {
   const requestId = crypto.randomUUID();
+  const lease = tryAcquireCopilotOperation();
+  if (!lease) {
+    return createCopilotBusyResponse(requestId);
+  }
+
+  try {
+    return await handlePost(request, context, requestId);
+  } finally {
+    lease.release();
+  }
+}
+
+async function handlePost(
+  request: Request,
+  context: RecipeRouteContext,
+  requestId: string,
+) {
   const logger = createRecipeLogger(requestId);
   const { id } = await context.params;
   let body: unknown;

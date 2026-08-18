@@ -14,9 +14,11 @@ a persistent volume.
 No deployment resources are created yet because the final choice affects the
 database adapter and operating cost.
 
-The current app has no user authentication. A public deployment must either be
-network-restricted to the owner or add authentication and request rate limiting
-before exposing Copilot-backed endpoints and saved recipes to the internet.
+The current app is intended for a private Tailscale Serve deployment. In
+production it requires a verified Serve identity for recipe APIs and an exact
+HTTPS Origin for mutations. Direct public deployment is unsupported because a
+client that can reach the application port could spoof the identity header.
+See [Private Agent Outpost deployment](agent-outpost-deployment.md).
 
 ## Runtime constraints
 

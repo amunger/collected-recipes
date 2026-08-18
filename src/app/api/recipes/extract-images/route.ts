@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  createCopilotBusyResponse,
+  tryAcquireCopilotOperation,
+} from "@/lib/copilot-operation-gate";
 import { enrichRecipe } from "@/lib/enrich-recipe";
 import { extractRecipeImages } from "@/lib/extract-recipe";
 import { parseRecipeImageRequest } from "@/lib/recipe-image-request";
@@ -8,6 +12,19 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
+  const lease = tryAcquireCopilotOperation();
+  if (!lease) {
+    return createCopilotBusyResponse(requestId);
+  }
+
+  try {
+    return await handlePost(request, requestId);
+  } finally {
+    lease.release();
+  }
+}
+
+async function handlePost(request: Request, requestId: string) {
   const logger = createRecipeLogger(requestId);
   let formData: FormData;
 

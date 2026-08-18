@@ -76,6 +76,45 @@ describe("POST /api/recipes/extract", () => {
     });
   });
 
+  test("rejects concurrent Copilot work immediately", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    let finishExtraction:
+      | ((value: typeof proteinWaffleResult) => void)
+      | undefined;
+    mockedExtractRecipe.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishExtraction = resolve;
+      }),
+    );
+    mockedEnrichRecipe.mockResolvedValueOnce({
+      ...proteinWaffleResult,
+      nutrition: proteinWaffleNutrition,
+    });
+    const createRequest = () =>
+      new Request("http://localhost/api/recipes/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: "https://example.com/recipe" }),
+      });
+
+    const activeResponse = POST(createRequest());
+    await vi.waitFor(() => {
+      expect(mockedExtractRecipe).toHaveBeenCalledTimes(1);
+    });
+    const busyResponse = await POST(createRequest());
+
+    expect(busyResponse.status).toBe(429);
+    expect(busyResponse.headers.get("Retry-After")).toBe("5");
+    await expect(busyResponse.json()).resolves.toMatchObject({
+      error: expect.stringContaining("Wait for it to finish"),
+      requestId: expect.any(String),
+    });
+    expect(mockedExtractRecipe).toHaveBeenCalledTimes(1);
+
+    finishExtraction?.(proteinWaffleResult);
+    expect((await activeResponse).status).toBe(200);
+  });
+
   test("rejects oversized special instructions", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
 

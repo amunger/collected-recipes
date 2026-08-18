@@ -1,3 +1,5 @@
+# Standalone-VM example only. The public host-port mapping below must not be
+# used on the shared Agent Outpost VM; see docs/agent-outpost-deployment.md.
 services:
   collected-recipes:
     build:
@@ -11,6 +13,8 @@ services:
       PORT: "3000"
       RECIPE_DATABASE_PATH: /data/recipes.db
     ports:
+      # Requires standalone-VM network restrictions. Never copy this public
+      # mapping to Agent Outpost, where the app must be loopback-only.
       - "80:3000"
     volumes:
       - type: bind

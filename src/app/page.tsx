@@ -25,6 +25,21 @@ interface SavedRecipeListResponse extends ApiError {
   readonly recipes?: ReadonlyArray<SavedRecipe>;
 }
 
+function recipeOperationError(
+  response: Response,
+  result: ApiError,
+  fallback: string,
+): Error {
+  if (response.status === 429) {
+    return new Error(
+      result.error ??
+        "Another recipe operation is in progress. Wait a moment, then try again.",
+    );
+  }
+
+  return new Error(result.error ?? fallback);
+}
+
 interface RecentRecipe {
   readonly id: string;
   readonly recipe: EnrichedRecipe;
@@ -307,8 +322,10 @@ export default function Home() {
       });
       const result = (await response.json()) as ExtractRecipeResponse;
       if (!response.ok) {
-        throw new Error(
-          result.error ?? "The recipe could not be generated.",
+        throw recipeOperationError(
+          response,
+          result,
+          "The recipe could not be generated.",
         );
       }
 
@@ -382,8 +399,10 @@ export default function Home() {
       });
       const result = (await response.json()) as ExtractRecipeResponse;
       if (!response.ok) {
-        throw new Error(
-          result.error ?? "The recipe could not be read from the images.",
+        throw recipeOperationError(
+          response,
+          result,
+          "The recipe could not be read from the images.",
         );
       }
 
@@ -491,8 +510,10 @@ export default function Home() {
       });
       const result = (await response.json()) as ExtractRecipeResponse;
       if (!response.ok) {
-        throw new Error(
-          result.error ?? "The recipe could not be transformed.",
+        throw recipeOperationError(
+          response,
+          result,
+          "The recipe could not be transformed.",
         );
       }
       const transformedRecipe = parseRecipeResponse(result);
