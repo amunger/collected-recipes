@@ -10,6 +10,8 @@ export interface Ingredient {
 export interface IngredientResult {
   readonly ingredients: ReadonlyArray<Ingredient>;
   readonly instructions: ReadonlyArray<string>;
+  readonly name?: string | null;
+  readonly servings?: number | null;
 }
 
 export class InvalidIngredientResultError extends Error {
@@ -109,8 +111,17 @@ export function validateIngredientResult(value: unknown): IngredientResult {
   }
 
   const record = value as Readonly<Record<string, unknown>>;
+  const hasRecipeMetadata = hasExactKeys(record, [
+    "ingredients",
+    "instructions",
+    "name",
+    "servings",
+  ]);
   if (
-    !hasExactKeys(record, ["ingredients", "instructions"]) ||
+    !(
+      hasRecipeMetadata ||
+      hasExactKeys(record, ["ingredients", "instructions"])
+    ) ||
     !Array.isArray(record.ingredients) ||
     record.ingredients.length === 0 ||
     !Array.isArray(record.instructions) ||
@@ -133,9 +144,36 @@ export function validateIngredientResult(value: unknown): IngredientResult {
     return instruction.trim();
   });
 
+  let name: string | null = null;
+  if (record.name !== undefined) {
+    if (record.name !== null && typeof record.name !== "string") {
+      throw new InvalidIngredientResultError(
+        "name must be a string or null.",
+      );
+    }
+    const normalizedName = record.name?.trim() ?? "";
+    name = normalizedName || null;
+  }
+
+  let servings: number | null = null;
+  if (record.servings !== undefined) {
+    if (
+      record.servings !== null &&
+      (typeof record.servings !== "number" ||
+        !Number.isFinite(record.servings) ||
+        record.servings <= 0)
+    ) {
+      throw new InvalidIngredientResultError(
+        "servings must be a positive number or null.",
+      );
+    }
+    servings = record.servings;
+  }
+
   return {
     ingredients: record.ingredients.map(parseIngredient),
     instructions,
+    ...(hasRecipeMetadata ? { name, servings } : {}),
   };
 }
 

@@ -43,6 +43,29 @@ describe("ingredient result validation", () => {
     );
   });
 
+  test("parses recipe name and servings metadata", () => {
+    expect(
+      validateIngredientResult({
+        ingredients: [
+          {
+            amount: "1",
+            estimatedGrams: 120,
+            group: null,
+            unit: "cup",
+            ingredient: "flour",
+            notes: null,
+          },
+        ],
+        instructions: ["Mix."],
+        name: "Simple Cake",
+        servings: 8,
+      }),
+    ).toMatchObject({
+      name: "Simple Cake",
+      servings: 8,
+    });
+  });
+
   test("normalizes legacy saved ingredients without groups", () => {
     const legacyIngredient = {
       amount: "1",

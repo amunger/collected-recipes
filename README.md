@@ -74,12 +74,15 @@ recipe endpoints are available at `GET|POST /api/recipes`,
   "instructions": [
     "Add all ingredients to a high speed blender and blend until smooth, scraping down the sides as necessary."
   ],
+  "name": "Protein Waffles",
+  "servings": 4,
   "requestId": "f62088aa-e71b-48dc-b7e5-800888765a6f"
 }
 ```
 
 `amount`, `group`, `unit`, and `notes` may be `null`. `ingredient` and every
-instruction are non-empty strings.
+instruction are non-empty strings. `name` is the extracted recipe title or
+`null`, and `servings` is the extracted positive serving count or `null`.
 
 Do not expose this application directly to the public internet. The trusted
 identity header is safe only when direct access to the app port is blocked.

@@ -276,6 +276,8 @@ export default function Home() {
     return {
       ingredients: result.ingredients,
       instructions: result.instructions,
+      name: result.name ?? null,
+      servings: result.servings ?? null,
       nutrition: result.nutrition,
     };
   }
@@ -333,7 +335,7 @@ export default function Home() {
       const extractedRecipe = parseRecipeResponse(result);
       setRecipe(extractedRecipe);
       setSelectedSavedRecipeId(null);
-      setSaveName("");
+      setSaveName(extractedRecipe.name ?? "");
       setCustomNotes("");
       setNotesDraft("");
       setIsEditingNotes(false);
@@ -410,7 +412,7 @@ export default function Home() {
       const extractedRecipe = parseRecipeResponse(result);
       setRecipe(extractedRecipe);
       setSelectedSavedRecipeId(null);
-      setSaveName("");
+      setSaveName(extractedRecipe.name ?? "");
       setUrl("");
       setCustomNotes("");
       setNotesDraft("");
@@ -473,7 +475,7 @@ export default function Home() {
     setActiveRecentRecipeId(recent.id);
     setHasUnsavedChanges(true);
     setSaveFeedback("");
-    setSaveName("");
+    setSaveName(recent.recipe.name ?? "");
     setCustomNotes("");
     setNotesDraft("");
     setIsEditingNotes(false);
@@ -504,6 +506,8 @@ export default function Home() {
           recipe: {
             ingredients: recipe.ingredients,
             instructions: recipe.instructions,
+            name: recipe.name ?? null,
+            servings: recipe.servings ?? null,
           },
           specialInstructions,
         }),
@@ -564,6 +568,8 @@ export default function Home() {
           recipe: {
             ingredients: recipe.ingredients,
             instructions: recipe.instructions,
+            name: recipe.name ?? null,
+            servings: recipe.servings ?? null,
           },
           sourceUrl: url || null,
           specialInstructions: appliedSpecialInstructions,
@@ -972,6 +978,20 @@ export default function Home() {
                 <h2 id="active-recipe-heading" tabIndex={-1}>
                   {saveName || "Untitled recipe"}
                 </h2>
+                {recipe.servings !== null && recipe.servings !== undefined && (
+                  <p>Servings: {recipe.servings}</p>
+                )}
+                {url && (
+                  <p>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View original recipe
+                    </a>
+                  </p>
+                )}
                 {appliedSpecialInstructions && (
                   <p>Last adapted: {appliedSpecialInstructions}</p>
                 )}
