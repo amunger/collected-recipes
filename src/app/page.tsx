@@ -180,6 +180,7 @@ export default function Home() {
   const [collectSource, setCollectSource] =
     useState<CollectSource>("link");
   const [url, setUrl] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [collectPrompt, setCollectPrompt] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [recipeImages, setRecipeImages] = useState<ReadonlyArray<File>>([]);
@@ -309,6 +310,7 @@ export default function Home() {
     if (!canReplaceActiveRecipe()) {
       return;
     }
+    const submittedSourceUrl = url.trim();
     setError("");
     setIsLoading(true);
     setRecipeImages([]);
@@ -336,6 +338,7 @@ export default function Home() {
       setRecipe(extractedRecipe);
       setSelectedSavedRecipeId(null);
       setSaveName(extractedRecipe.name ?? "");
+      setSourceUrl(submittedSourceUrl);
       setCustomNotes("");
       setNotesDraft("");
       setIsEditingNotes(false);
@@ -351,7 +354,7 @@ export default function Home() {
       const recent = {
         id: crypto.randomUUID(),
         recipe: extractedRecipe,
-        sourceUrl: url,
+        sourceUrl: submittedSourceUrl,
         specialInstructions: appliedInstructions,
         viewedAt: new Date().toISOString(),
       };
@@ -414,6 +417,7 @@ export default function Home() {
       setSelectedSavedRecipeId(null);
       setSaveName(extractedRecipe.name ?? "");
       setUrl("");
+      setSourceUrl("");
       setCustomNotes("");
       setNotesDraft("");
       setIsEditingNotes(false);
@@ -459,6 +463,7 @@ export default function Home() {
     setNotesDraft(saved.customNotes ?? "");
     setIsEditingNotes(false);
     setUrl(saved.sourceUrl ?? "");
+    setSourceUrl(saved.sourceUrl ?? "");
     setAppliedSpecialInstructions(saved.specialInstructions);
     setSpecialInstructions("");
     setError("");
@@ -480,6 +485,7 @@ export default function Home() {
     setNotesDraft("");
     setIsEditingNotes(false);
     setUrl(recent.sourceUrl);
+    setSourceUrl(recent.sourceUrl);
     setAppliedSpecialInstructions(recent.specialInstructions);
     setSpecialInstructions("");
     setError("");
@@ -571,7 +577,7 @@ export default function Home() {
             name: recipe.name ?? null,
             servings: recipe.servings ?? null,
           },
-          sourceUrl: url || null,
+          sourceUrl: sourceUrl || null,
           specialInstructions: appliedSpecialInstructions,
         }),
       });
@@ -981,10 +987,10 @@ export default function Home() {
                 {recipe.servings !== null && recipe.servings !== undefined && (
                   <p>Servings: {recipe.servings}</p>
                 )}
-                {url && (
+                {sourceUrl && (
                   <p>
                     <a
-                      href={url}
+                      href={sourceUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
