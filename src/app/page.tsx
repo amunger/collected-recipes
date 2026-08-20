@@ -1185,6 +1185,30 @@ export default function Home() {
                         {formatMacro(recipe.nutrition.totals.fatGrams)}
                       </td>
                     </tr>
+                    {recipe.servings && recipe.servings > 0 && (
+                      <tr>
+                        <th>Per serving</th>
+                        <td>{recipe.servings} servings</td>
+                        <td>
+                          {formatMacro(
+                            recipe.nutrition.totals.carbohydratesGrams /
+                              recipe.servings,
+                          )}
+                        </td>
+                        <td>
+                          {formatMacro(
+                            recipe.nutrition.totals.proteinGrams /
+                              recipe.servings,
+                          )}
+                        </td>
+                        <td>
+                          {formatMacro(
+                            recipe.nutrition.totals.fatGrams /
+                              recipe.servings,
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>
