@@ -3,7 +3,11 @@
 import { Fragment, FormEvent, useEffect, useState } from "react";
 import type { EnrichedRecipe } from "@/lib/enrich-recipe";
 import { validateIngredientResult } from "@/lib/ingredient-result";
-import { validateNutritionResult } from "@/lib/nutrition";
+import {
+  validateNutritionResult,
+  type IngredientNutrition,
+  type NutritionResult,
+} from "@/lib/nutrition";
 import {
   formatIngredient,
   formatRecipeMarkdown,
@@ -50,8 +54,17 @@ interface RecentRecipe {
 
 type AppTab = "collect" | "saved" | "recipe";
 type CollectSource = "link" | "images";
+type EditableMacroField =
+  | "carbohydratesGrams"
+  | "proteinGrams"
+  | "fatGrams";
 
 const recentRecipesKey = "collected-recipes.recent";
+const editableMacroLabels: Readonly<Record<EditableMacroField, string>> = {
+  carbohydratesGrams: "Carbs",
+  fatGrams: "Fat",
+  proteinGrams: "Protein",
+};
 
 function parseRecentRecipe(value: unknown): RecentRecipe | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -175,6 +188,74 @@ function formatMacro(value: number | null): string {
   return value === null ? "—" : `${value.toFixed(1)} g`;
 }
 
+function roundMacro(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function updateNutritionAfterManualEdit(
+  nutrition: NutritionResult,
+  ingredientIndex: number,
+  field: EditableMacroField,
+  value: number | null,
+): NutritionResult {
+  const ingredients = nutrition.ingredients.map((ingredient, index) =>
+    index === ingredientIndex
+      ? { ...ingredient, [field]: value }
+      : ingredient,
+  );
+  const includedIngredientCount = ingredients.filter(
+    (ingredient) =>
+      ingredient.carbohydratesGrams !== null &&
+      ingredient.proteinGrams !== null &&
+      ingredient.fatGrams !== null,
+  ).length;
+  const omittedIngredientCount = ingredients.length - includedIngredientCount;
+  const status =
+    includedIngredientCount === ingredients.length
+      ? "complete"
+      : includedIngredientCount > 0
+        ? "partial"
+        : "unavailable";
+
+  return {
+    ...nutrition,
+    ingredients,
+    message:
+      omittedIngredientCount === 0
+        ? null
+        : nutrition.message ?? "Some ingredients are still missing macro values.",
+    status,
+    totals: {
+      carbohydratesGrams: roundMacro(
+        ingredients.reduce(
+          (total, ingredient) => total + (ingredient.carbohydratesGrams ?? 0),
+          0,
+        ),
+      ),
+      fatGrams: roundMacro(
+        ingredients.reduce(
+          (total, ingredient) => total + (ingredient.fatGrams ?? 0),
+          0,
+        ),
+      ),
+      includedIngredientCount,
+      omittedIngredientCount,
+      proteinGrams: roundMacro(
+        ingredients.reduce(
+          (total, ingredient) => total + (ingredient.proteinGrams ?? 0),
+          0,
+        ),
+      ),
+    },
+  };
+}
+
+interface MacroEditState {
+  readonly draftValue: string;
+  readonly field: EditableMacroField;
+  readonly ingredientIndex: number;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<AppTab>("collect");
   const [collectSource, setCollectSource] =
@@ -210,6 +291,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [macroEdit, setMacroEdit] = useState<MacroEditState | null>(
+    null,
+  );
 
   async function fetchSavedRecipes(): Promise<
     ReadonlyArray<SavedRecipe>
@@ -653,6 +737,114 @@ export default function Home() {
     link.download = "recipe.md";
     link.click();
     URL.revokeObjectURL(downloadUrl);
+  }
+
+  function startMacroEdit(
+    ingredientIndex: number,
+    field: EditableMacroField,
+    currentValue: number | null,
+  ): void {
+    setError("");
+    setMacroEdit({
+      draftValue: currentValue === null ? "" : currentValue.toString(),
+      field,
+      ingredientIndex,
+    });
+  }
+
+  function saveMacroEdit(): void {
+    if (!recipe || !macroEdit) {
+      return;
+    }
+
+    const { draftValue, field, ingredientIndex } = macroEdit;
+    setMacroEdit(null);
+    const trimmedValue = draftValue.trim();
+    const parsedValue = trimmedValue === "" ? null : Number(trimmedValue);
+    if (
+      trimmedValue !== "" &&
+      (typeof parsedValue !== "number" ||
+        !Number.isFinite(parsedValue) ||
+        parsedValue < 0)
+    ) {
+      setError(`${editableMacroLabels[field]} must be a non-negative number.`);
+      return;
+    }
+
+    const normalizedValue =
+      parsedValue === null ? null : roundMacro(parsedValue);
+    const previousValue =
+      recipe.nutrition.ingredients[ingredientIndex]?.[field];
+    if (previousValue === normalizedValue) {
+      return;
+    }
+
+    setRecipe((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        nutrition: updateNutritionAfterManualEdit(
+          current.nutrition,
+          ingredientIndex,
+          field,
+          normalizedValue,
+        ),
+      };
+    });
+    setHasUnsavedChanges(true);
+    setSaveFeedback("");
+  }
+
+  function renderMacroCell(
+    ingredient: IngredientNutrition,
+    ingredientIndex: number,
+    field: EditableMacroField,
+  ) {
+    const isEditing =
+      macroEdit?.ingredientIndex === ingredientIndex &&
+      macroEdit.field === field;
+    if (isEditing) {
+      return (
+        <input
+          aria-label={`${editableMacroLabels[field]} for ${ingredient.ingredient}`}
+          autoFocus
+          className={styles.macroValueInput}
+          inputMode="decimal"
+          onBlur={saveMacroEdit}
+          onChange={(event) => {
+            setMacroEdit((current) =>
+              current
+                ? { ...current, draftValue: event.target.value }
+                : current,
+            );
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setMacroEdit(null);
+            } else if (event.key === "Enter") {
+              event.preventDefault();
+              saveMacroEdit();
+            }
+          }}
+          type="text"
+          value={macroEdit.draftValue}
+        />
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={styles.macroValueButton}
+        onClick={() =>
+          startMacroEdit(ingredientIndex, field, ingredient[field])
+        }
+      >
+        {formatMacro(ingredient[field])}
+      </button>
+    );
   }
 
   return (
@@ -1160,9 +1352,15 @@ export default function Home() {
                             ? "—"
                             : `${item.estimatedGrams} g`}
                         </td>
-                        <td>{formatMacro(item.carbohydratesGrams)}</td>
-                        <td>{formatMacro(item.proteinGrams)}</td>
-                        <td>{formatMacro(item.fatGrams)}</td>
+                        <td>
+                          {renderMacroCell(
+                            item,
+                            index,
+                            "carbohydratesGrams",
+                          )}
+                        </td>
+                        <td>{renderMacroCell(item, index, "proteinGrams")}</td>
+                        <td>{renderMacroCell(item, index, "fatGrams")}</td>
                       </tr>
                     ))}
                   </tbody>

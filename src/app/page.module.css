@@ -963,6 +963,40 @@
   font-weight: 750;
 }
 
+.macroValueButton {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: text;
+  font: inherit;
+  text-align: right;
+}
+
+.macroValueButton:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid #9d3f1e;
+  outline-offset: 2px;
+}
+
+.macroValueInput {
+  width: 5.5rem;
+  padding: 5px 7px;
+  border: 1px solid #d8d0bf;
+  border-radius: 8px;
+  background: #fff;
+  color: #252117;
+  font: inherit;
+  text-align: right;
+}
+
+.macroValueInput:focus {
+  border-color: #9d3f1e;
+  box-shadow: 0 0 0 3px rgb(157 63 30 / 12%);
+  outline: none;
+}
+
 @media (max-width: 560px) {
   .inputRow {
     flex-direction: column;
