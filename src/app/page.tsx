@@ -198,17 +198,36 @@ function updateNutritionAfterManualEdit(
   field: EditableMacroField,
   value: number | null,
 ): NutritionResult {
-  const ingredients = nutrition.ingredients.map((ingredient, index) =>
-    index === ingredientIndex
-      ? { ...ingredient, [field]: value }
-      : ingredient,
-  );
-  const includedIngredientCount = ingredients.filter(
+  const ingredients = nutrition.ingredients.map((ingredient, index) => {
+    if (index !== ingredientIndex) {
+      return ingredient;
+    }
+
+    const updated = { ...ingredient, [field]: value };
+    const hasCompleteMacros =
+      updated.carbohydratesGrams !== null &&
+      updated.proteinGrams !== null &&
+      updated.fatGrams !== null;
+    const status: IngredientNutrition["status"] = hasCompleteMacros
+      ? ingredient.status === "matched"
+        ? "matched"
+        : "manual"
+      : ingredient.status === "matched" || ingredient.status === "manual"
+        ? "unmatched"
+        : ingredient.status;
+
+    return {
+      ...updated,
+      status,
+    };
+  });
+  const includedIngredients = ingredients.filter(
     (ingredient) =>
       ingredient.carbohydratesGrams !== null &&
       ingredient.proteinGrams !== null &&
       ingredient.fatGrams !== null,
-  ).length;
+  );
+  const includedIngredientCount = includedIngredients.length;
   const omittedIngredientCount = ingredients.length - includedIngredientCount;
   const status =
     includedIngredientCount === ingredients.length
@@ -227,13 +246,13 @@ function updateNutritionAfterManualEdit(
     status,
     totals: {
       carbohydratesGrams: roundMacro(
-        ingredients.reduce(
+        includedIngredients.reduce(
           (total, ingredient) => total + (ingredient.carbohydratesGrams ?? 0),
           0,
         ),
       ),
       fatGrams: roundMacro(
-        ingredients.reduce(
+        includedIngredients.reduce(
           (total, ingredient) => total + (ingredient.fatGrams ?? 0),
           0,
         ),
@@ -241,7 +260,7 @@ function updateNutritionAfterManualEdit(
       includedIngredientCount,
       omittedIngredientCount,
       proteinGrams: roundMacro(
-        ingredients.reduce(
+        includedIngredients.reduce(
           (total, ingredient) => total + (ingredient.proteinGrams ?? 0),
           0,
         ),

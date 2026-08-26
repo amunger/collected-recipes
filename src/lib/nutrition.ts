@@ -20,6 +20,7 @@ export interface NutritionProvider {
 }
 
 export type IngredientNutritionStatus =
+  | "manual"
   | "matched"
   | "provider-error"
   | "unmatched"
@@ -104,7 +105,7 @@ export function validateNutritionResult(value: unknown): NutritionResult {
       !ingredient ||
       typeof ingredient.description !== "string" ||
       typeof ingredient.ingredient !== "string" ||
-      !["matched", "provider-error", "unmatched", "unweighed"].includes(
+      !["manual", "matched", "provider-error", "unmatched", "unweighed"].includes(
         typeof status === "string" ? status : "",
       )
     ) {

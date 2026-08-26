@@ -93,4 +93,35 @@ describe("calculateRecipeNutrition", () => {
       ).toThrow("totals");
     },
   );
+
+  test("accepts manually completed nutrition rows", () => {
+    expect(() =>
+      validateNutritionResult({
+        calculatedAt: "2026-08-15T20:00:00.000Z",
+        ingredients: [
+          {
+            carbohydratesGrams: 10,
+            description: "Manually entered ingredient",
+            estimatedGrams: null,
+            fatGrams: 2,
+            ingredient: "ingredient",
+            proteinGrams: 3,
+            sourceDescription: null,
+            sourceFdcId: null,
+            status: "manual",
+          },
+        ],
+        message: null,
+        provider: "USDA FoodData Central",
+        status: "complete",
+        totals: {
+          carbohydratesGrams: 10,
+          fatGrams: 2,
+          includedIngredientCount: 1,
+          omittedIngredientCount: 0,
+          proteinGrams: 3,
+        },
+      }),
+    ).not.toThrow();
+  });
 });
