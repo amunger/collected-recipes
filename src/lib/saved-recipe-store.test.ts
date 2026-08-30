@@ -66,6 +66,35 @@ describe("SavedRecipeStore", () => {
     });
   });
 
+  test("adds saved recipe ingredients to and clears the grocery list", () => {
+    const created = store.create({
+      name: "Protein waffles",
+      nutrition: proteinWaffleNutrition,
+      recipe: proteinWaffleResult,
+    });
+
+    const firstItems = store.addRecipeToGroceryList(created.id);
+    expect(firstItems).toHaveLength(proteinWaffleResult.ingredients.length);
+    expect(firstItems[0]).toMatchObject({
+      ingredient: proteinWaffleResult.ingredients[0],
+      ingredientIndex: 0,
+      recipeName: "Protein waffles",
+      savedRecipeId: created.id,
+    });
+
+    const replacedItems = store.addRecipeToGroceryList(created.id);
+    expect(replacedItems).toHaveLength(proteinWaffleResult.ingredients.length);
+
+    store.clearGroceryList();
+    expect(store.listGroceryItems()).toEqual([]);
+  });
+
+  test("requires a saved recipe before adding grocery items", () => {
+    expect(() => store.addRecipeToGroceryList("missing")).toThrow(
+      SavedRecipeNotFoundError,
+    );
+  });
+
   test("validates names and missing updates", () => {
     expect(() =>
       store.create({

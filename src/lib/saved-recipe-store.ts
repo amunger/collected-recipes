@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import {
   validateIngredientResult,
+  type Ingredient,
   type IngredientResult,
 } from "@/lib/ingredient-result";
 import {
@@ -31,6 +32,15 @@ export interface SaveRecipeInput {
   readonly specialInstructions?: string | null;
 }
 
+export interface GroceryListItem {
+  readonly addedAt: string;
+  readonly id: string;
+  readonly ingredient: Ingredient;
+  readonly ingredientIndex: number;
+  readonly recipeName: string;
+  readonly savedRecipeId: string;
+}
+
 interface SavedRecipeRow {
   readonly created_at: string;
   readonly custom_notes: string | null;
@@ -41,6 +51,15 @@ interface SavedRecipeRow {
   readonly source_url: string | null;
   readonly special_instructions: string | null;
   readonly updated_at: string;
+}
+
+interface GroceryListItemRow {
+  readonly added_at: string;
+  readonly id: string;
+  readonly ingredient_index: number;
+  readonly ingredient_json: string;
+  readonly recipe_name: string;
+  readonly saved_recipe_id: string;
 }
 
 export class SavedRecipeNotFoundError extends Error {
@@ -77,6 +96,24 @@ function mapRow(row: SavedRecipeRow): SavedRecipe {
     sourceUrl: row.source_url,
     specialInstructions: row.special_instructions,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapGroceryListItem(row: GroceryListItemRow): GroceryListItem {
+  const ingredient = validateIngredientResult({
+    ingredients: [parseStoredJson(row.ingredient_json, "grocery ingredient")],
+    instructions: ["Stored grocery list item."],
+  }).ingredients[0];
+  if (!ingredient) {
+    throw new Error("Stored grocery ingredient JSON is empty.");
+  }
+  return {
+    addedAt: row.added_at,
+    id: row.id,
+    ingredient,
+    ingredientIndex: row.ingredient_index,
+    recipeName: row.recipe_name,
+    savedRecipeId: row.saved_recipe_id,
   };
 }
 
@@ -124,6 +161,17 @@ export class SavedRecipeStore {
       );
       CREATE INDEX IF NOT EXISTS saved_recipes_updated_at
         ON saved_recipes(updated_at DESC);
+      CREATE TABLE IF NOT EXISTS grocery_list_items (
+        id TEXT PRIMARY KEY,
+        saved_recipe_id TEXT NOT NULL,
+        recipe_name TEXT NOT NULL,
+        ingredient_index INTEGER NOT NULL,
+        ingredient_json TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        UNIQUE(saved_recipe_id, ingredient_index)
+      );
+      CREATE INDEX IF NOT EXISTS grocery_list_items_added_at
+        ON grocery_list_items(added_at, ingredient_index);
     `);
     const columns = this.#database
       .prepare("PRAGMA table_info(saved_recipes)")
@@ -188,6 +236,55 @@ export class SavedRecipeStore {
       )
       .all() as SavedRecipeRow[];
     return rows.map(mapRow);
+  }
+
+  addRecipeToGroceryList(id: string): ReadonlyArray<GroceryListItem> {
+    const savedRecipe = this.get(id);
+    if (!savedRecipe) {
+      throw new SavedRecipeNotFoundError(id);
+    }
+
+    const replaceRecipeItems = this.#database.transaction(() => {
+      this.#database
+        .prepare("DELETE FROM grocery_list_items WHERE saved_recipe_id = ?")
+        .run(id);
+      const addedAt = new Date().toISOString();
+      const insert = this.#database.prepare(
+        `INSERT INTO grocery_list_items (
+          id, saved_recipe_id, recipe_name, ingredient_index, ingredient_json,
+          added_at
+        ) VALUES (
+          @id, @savedRecipeId, @recipeName, @ingredientIndex, @ingredientJson,
+          @addedAt
+        )`,
+      );
+      savedRecipe.recipe.ingredients.forEach((ingredient, ingredientIndex) => {
+        insert.run({
+          addedAt,
+          id: crypto.randomUUID(),
+          ingredientIndex,
+          ingredientJson: JSON.stringify(ingredient),
+          recipeName: savedRecipe.name,
+          savedRecipeId: savedRecipe.id,
+        });
+      });
+    });
+    replaceRecipeItems();
+    return this.listGroceryItems();
+  }
+
+  clearGroceryList(): void {
+    this.#database.prepare("DELETE FROM grocery_list_items").run();
+  }
+
+  listGroceryItems(): ReadonlyArray<GroceryListItem> {
+    const rows = this.#database
+      .prepare(
+        `SELECT * FROM grocery_list_items
+         ORDER BY added_at ASC, saved_recipe_id ASC, ingredient_index ASC`,
+      )
+      .all() as GroceryListItemRow[];
+    return rows.map(mapGroceryListItem);
   }
 
   update(id: string, input: SaveRecipeInput): SavedRecipe {

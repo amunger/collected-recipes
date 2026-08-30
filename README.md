@@ -54,10 +54,14 @@ either setting is missing or unsafe. Tailscale identity is required for every
    Save as.
 9. Up to three recently viewed unsaved recipes remain available in local
    browser history.
+10. A saved recipe can add its ingredients to the persistent grocery list.
+    Adding it again refreshes that recipe's items, and the entire list can be
+    cleared from the Groceries tab.
 
 The extraction API returns a request ID, recipe, and nutrition result. Saved
 recipe endpoints are available at `GET|POST /api/recipes`,
-`GET|PUT /api/recipes/:id`, and `POST /api/recipes/:id/transform`.
+`GET|PUT /api/recipes/:id`, `POST /api/recipes/:id/transform`, and
+`GET|POST|DELETE /api/recipes/grocery-list`.
 
 ```json
 {

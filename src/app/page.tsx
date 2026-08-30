@@ -12,7 +12,10 @@ import {
   formatIngredient,
   formatRecipeMarkdown,
 } from "@/lib/recipe-markdown";
-import type { SavedRecipe } from "@/lib/saved-recipe-store";
+import type {
+  GroceryListItem,
+  SavedRecipe,
+} from "@/lib/saved-recipe-store";
 import styles from "./page.module.css";
 
 interface ApiError {
@@ -27,6 +30,10 @@ interface SavedRecipeResponse extends ApiError {
 
 interface SavedRecipeListResponse extends ApiError {
   readonly recipes?: ReadonlyArray<SavedRecipe>;
+}
+
+interface GroceryListResponse extends ApiError {
+  readonly items?: ReadonlyArray<GroceryListItem>;
 }
 
 function recipeOperationError(
@@ -52,7 +59,7 @@ interface RecentRecipe {
   readonly viewedAt: string;
 }
 
-type AppTab = "collect" | "saved" | "recipe";
+type AppTab = "collect" | "saved" | "groceries" | "recipe";
 type CollectSource = "link" | "images";
 type EditableMacroField =
   | "carbohydratesGrams"
@@ -133,6 +140,36 @@ function recentRecipeLabel(recipe: RecentRecipe): string {
   return recipe.sourceUrl
     ? new URL(recipe.sourceUrl).hostname.replace(/^www\./, "")
     : "Uploaded recipe";
+}
+
+function groupGroceryItems(
+  items: ReadonlyArray<GroceryListItem>,
+): ReadonlyArray<{
+  readonly items: ReadonlyArray<GroceryListItem>;
+  readonly recipeName: string;
+  readonly savedRecipeId: string;
+}> {
+  const groups = new Map<
+    string,
+    {
+      items: GroceryListItem[];
+      recipeName: string;
+      savedRecipeId: string;
+    }
+  >();
+  for (const item of items) {
+    const group = groups.get(item.savedRecipeId);
+    if (group) {
+      group.items.push(item);
+    } else {
+      groups.set(item.savedRecipeId, {
+        items: [item],
+        recipeName: item.recipeName,
+        savedRecipeId: item.savedRecipeId,
+      });
+    }
+  }
+  return [...groups.values()];
 }
 
 function writeClipboardWithTimeout(value: string): Promise<void> {
@@ -290,6 +327,9 @@ export default function Home() {
   const [savedRecipes, setSavedRecipes] = useState<
     ReadonlyArray<SavedRecipe>
   >([]);
+  const [groceryList, setGroceryList] = useState<
+    ReadonlyArray<GroceryListItem>
+  >([]);
   const [recentRecipes, setRecentRecipes] = useState<
     ReadonlyArray<RecentRecipe>
   >([]);
@@ -307,8 +347,11 @@ export default function Home() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [error, setError] = useState("");
   const [libraryError, setLibraryError] = useState("");
+  const [groceryListError, setGroceryListError] = useState("");
+  const [groceryFeedback, setGroceryFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingGroceryList, setIsUpdatingGroceryList] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [macroEdit, setMacroEdit] = useState<MacroEditState | null>(
     null,
@@ -340,6 +383,15 @@ export default function Home() {
     }
   }
 
+  async function fetchGroceryList(): Promise<ReadonlyArray<GroceryListItem>> {
+    const response = await fetch("/api/recipes/grocery-list");
+    const result = (await response.json()) as GroceryListResponse;
+    if (!response.ok || !result.items) {
+      throw new Error(result.error ?? "The grocery list could not be loaded.");
+    }
+    return result.items;
+  }
+
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
@@ -360,6 +412,23 @@ export default function Home() {
             caughtError instanceof Error
               ? caughtError.message
               : "Saved recipes could not be loaded.",
+          );
+        }
+      },
+    );
+    fetchGroceryList().then(
+      (items) => {
+        if (!cancelled) {
+          setGroceryList(items);
+          setGroceryListError("");
+        }
+      },
+      (caughtError: unknown) => {
+        if (!cancelled) {
+          setGroceryListError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "The grocery list could not be loaded.",
           );
         }
       },
@@ -722,6 +791,73 @@ export default function Home() {
     }
   }
 
+  async function addActiveRecipeToGroceryList(): Promise<void> {
+    if (!selectedSavedRecipeId || hasUnsavedChanges) {
+      return;
+    }
+    setError("");
+    setGroceryFeedback("");
+    setIsUpdatingGroceryList(true);
+
+    try {
+      const response = await fetch("/api/recipes/grocery-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ savedRecipeId: selectedSavedRecipeId }),
+      });
+      const result = (await response.json()) as GroceryListResponse;
+      if (!response.ok || !result.items) {
+        throw new Error(
+          result.error ?? "The recipe could not be added to the grocery list.",
+        );
+      }
+      setGroceryList(result.items);
+      setGroceryListError("");
+      setGroceryFeedback("Added to grocery list.");
+    } catch (caughtError: unknown) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "The recipe could not be added to the grocery list.",
+      );
+    } finally {
+      setIsUpdatingGroceryList(false);
+    }
+  }
+
+  async function clearGroceryList(): Promise<void> {
+    if (
+      groceryList.length === 0 ||
+      !window.confirm("Clear every item from the grocery list?")
+    ) {
+      return;
+    }
+    setGroceryListError("");
+    setIsUpdatingGroceryList(true);
+
+    try {
+      const response = await fetch("/api/recipes/grocery-list", {
+        method: "DELETE",
+      });
+      const result = (await response.json()) as GroceryListResponse;
+      if (!response.ok || !result.items) {
+        throw new Error(
+          result.error ?? "The grocery list could not be cleared.",
+        );
+      }
+      setGroceryList(result.items);
+      setGroceryFeedback("");
+    } catch (caughtError: unknown) {
+      setGroceryListError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "The grocery list could not be cleared.",
+      );
+    } finally {
+      setIsUpdatingGroceryList(false);
+    }
+  }
+
   function formatRecipe(): string {
     if (!recipe) {
       return "";
@@ -897,6 +1033,18 @@ export default function Home() {
         >
           Saved
           {savedRecipes.length > 0 && <span>{savedRecipes.length}</span>}
+        </button>
+        <button
+          type="button"
+          aria-current={activeTab === "groceries" ? "page" : undefined}
+          className={activeTab === "groceries" ? styles.activeTab : undefined}
+          onClick={() => {
+            setActiveTab("groceries");
+            setError("");
+          }}
+        >
+          Groceries
+          {groceryList.length > 0 && <span>{groceryList.length}</span>}
         </button>
         <button
           type="button"
@@ -1120,6 +1268,58 @@ export default function Home() {
         </section>
       )}
 
+      {activeTab === "groceries" && (
+        <section className={styles.tabPanel}>
+          <div className={styles.sectionHeading}>
+            <div>
+              <span className={styles.eyebrow}>Shopping</span>
+              <h2>Grocery list</h2>
+              <p>Ingredients added from your saved recipes.</p>
+            </div>
+            {groceryList.length > 0 && (
+              <button
+                type="button"
+                className={styles.clearButton}
+                disabled={isUpdatingGroceryList}
+                onClick={() => void clearGroceryList()}
+              >
+                {isUpdatingGroceryList ? "Clearing..." : "Clear all"}
+              </button>
+            )}
+          </div>
+          {groceryListError && (
+            <p className={styles.error} role="alert">
+              {groceryListError}
+            </p>
+          )}
+          {groceryList.length === 0 && !groceryListError ? (
+            <div className={styles.emptyState}>
+              <h3>Your grocery list is empty</h3>
+              <p>Open a saved recipe and add its ingredients here.</p>
+              <button type="button" onClick={() => setActiveTab("saved")}>
+                View saved recipes
+              </button>
+            </div>
+          ) : (
+            <div className={styles.groceryRecipeList}>
+              {groupGroceryItems(groceryList).map((group) => (
+                <section
+                  className={styles.groceryRecipe}
+                  key={group.savedRecipeId}
+                >
+                  <h3>{group.recipeName}</h3>
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={item.id}>{formatIngredient(item.ingredient)}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {activeTab === "recipe" && recipe && (
         <section className={styles.recipeWorkspace}>
           <div className={styles.saveBar}>
@@ -1212,8 +1412,30 @@ export default function Home() {
                 {appliedSpecialInstructions && (
                   <p>Last adapted: {appliedSpecialInstructions}</p>
                 )}
+                {groceryFeedback && (
+                  <p className={styles.groceryFeedback} role="status">
+                    {groceryFeedback}
+                  </p>
+                )}
               </div>
               <div className={styles.actions}>
+                {selectedSavedRecipeId && (
+                  <button
+                    type="button"
+                    className={styles.groceryAction}
+                    disabled={hasUnsavedChanges || isUpdatingGroceryList}
+                    title={
+                      hasUnsavedChanges
+                        ? "Save recipe changes before adding it"
+                        : "Add this saved recipe's ingredients"
+                    }
+                    onClick={() => void addActiveRecipeToGroceryList()}
+                  >
+                    {isUpdatingGroceryList
+                      ? "Adding..."
+                      : "Add to grocery list"}
+                  </button>
+                )}
                 <button type="button" onClick={copyRecipe}>
                   {copyLabel}
                 </button>

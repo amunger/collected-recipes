@@ -469,7 +469,7 @@
   z-index: 10;
   top: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 5px;
   padding: 5px;
   border: 1px solid #d8d0bf;
@@ -751,6 +751,37 @@
   box-shadow: inset 3px 0 #9d3f1e;
 }
 
+.groceryRecipeList {
+  display: grid;
+  gap: 14px;
+}
+
+.groceryRecipe {
+  padding: 20px;
+  border: 1px solid #d8d0bf;
+  border-radius: 16px;
+  background: #fffdf8;
+}
+
+.groceryRecipe h3 {
+  color: #252117;
+  font-size: 1.1rem;
+}
+
+.groceryRecipe ul {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding-left: 1.3rem;
+  color: #302b22;
+  line-height: 1.55;
+}
+
+.sectionHeading > .clearButton {
+  background: #fde9e1;
+  color: #842d11;
+}
+
 .emptyState {
   display: grid;
   justify-items: start;
@@ -830,6 +861,16 @@
 
 .resultHeader h2 {
   font-size: 1.2rem;
+}
+
+.groceryFeedback {
+  color: #47734d;
+  font-weight: 700;
+}
+
+.actions .groceryAction {
+  background: #9d3f1e;
+  color: #fffdf8;
 }
 
 .modifyPanel {
@@ -1032,7 +1073,7 @@
   .tabs button {
     padding-right: 6px;
     padding-left: 6px;
-    font-size: 0.87rem;
+    font-size: 0.78rem;
   }
 
   .tabPanel,
@@ -1064,6 +1105,15 @@
     gap: 8px;
   }
 
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .actions .groceryAction {
+    width: 100%;
+  }
+
   .disclosure summary {
     padding: 6px 2px;
   }
@@ -1080,6 +1130,10 @@
 
   .actions button:hover {
     background: #e2d7c4;
+  }
+
+  .actions .groceryAction:hover:not(:disabled) {
+    background: #842d11;
   }
 
   .recipeNavigation button:hover,
